@@ -1,5 +1,5 @@
 <template>
-  <div class="practice" @keydown.esc="togglePause">
+  <div class="practice" @keydown.esc="togglePause" @click="inputRef?.focus()" tabindex="-1">
     <!-- Header bar -->
     <div class="practice-header">
       <div class="progress-info">
@@ -82,21 +82,24 @@
           >{{ char }}</span>
           <span class="cursor">|</span>
         </div>
-        <input
-          ref="inputRef"
-          v-model="currentInput"
-          class="hidden-input"
-          type="text"
-          autocomplete="off"
-          autocorrect="off"
-          autocapitalize="off"
-          spellcheck="false"
-          @keydown="handleKeydown"
-          @input="handleInput"
-        />
         <div class="input-hint">輸入羅馬字並按 Enter 確認</div>
       </div>
+
     </div>
+
+    <!-- Hidden input always in DOM regardless of pause/wrong state -->
+    <input
+      ref="inputRef"
+      v-model="currentInput"
+      class="hidden-input"
+      type="text"
+      autocomplete="off"
+      autocorrect="off"
+      autocapitalize="off"
+      spellcheck="false"
+      @keydown="handleKeydown"
+      @input="handleInput"
+    />
   </div>
 </template>
 
@@ -244,9 +247,9 @@ function handleInput() {
   const input = currentInput.value
   const kana = currentKana.value
 
-  // Check if wrong (no valid continuation)
+  // Immediately fail when input has no valid continuation
   if (isWrong(input, kana)) {
-    // Don't block input, just show red
+    submitWrong(input)
     return
   }
 
