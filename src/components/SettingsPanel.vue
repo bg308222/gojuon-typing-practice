@@ -3,6 +3,23 @@
     <h3 class="panel-title">設定</h3>
 
     <div class="settings-list">
+      <!-- Display Script -->
+      <div class="setting-item">
+        <div class="setting-info">
+          <span class="setting-label">顯示文字</span>
+          <span class="setting-desc">練習時顯示的假名種類</span>
+        </div>
+        <div class="mode-toggle">
+          <button
+            v-for="s in scripts"
+            :key="s.value"
+            class="mode-btn"
+            :class="{ active: settings.selectedScript === s.value }"
+            @click="settings.selectedScript = s.value as any"
+          >{{ s.label }}</button>
+        </div>
+      </div>
+
       <!-- Practice Mode -->
       <div class="setting-item">
         <div class="setting-info">
@@ -62,6 +79,12 @@
 import type { AppSettings } from '../data/db'
 
 const props = defineProps<{ settings: AppSettings }>()
+
+const scripts = [
+  { value: 'hiragana', label: '平假名' },
+  { value: 'katakana', label: '片假名' },
+  { value: 'both',     label: '兩者' },
+]
 
 const modes = [
   { value: 'count',    label: '題數' },

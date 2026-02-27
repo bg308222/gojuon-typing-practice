@@ -32,10 +32,21 @@
         <!-- Home / Setup view -->
         <div v-if="view === 'home'" class="home-layout">
           <div class="selector-col">
-            <KanaSelector :settings="settings" @start="startPractice" />
+            <KanaSelector :settings="settings" />
           </div>
           <div class="settings-col">
             <SettingsPanel :settings="settings" />
+            <div class="start-box">
+              <span class="count-label">已選 {{ settings.selectedKana.length }} 個假名</span>
+              <button
+                class="start-btn"
+                :disabled="settings.selectedKana.length === 0"
+                @click="startPractice"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                開始練習
+              </button>
+            </div>
           </div>
         </div>
 
@@ -362,9 +373,67 @@ button {
   align-items: start;
 }
 
+.settings-col {
+  position: sticky;
+  top: calc(3.25rem + 1.5rem); /* header height + padding */
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.start-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+}
+
+.count-label {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.start-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  border: none;
+  background: var(--primary);
+  color: #0c1a2a;
+  font-size: 1rem;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 150ms;
+}
+
+.start-btn:hover:not(:disabled) {
+  background: var(--primary-light);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--primary) 40%, transparent);
+}
+
+.start-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 @media (max-width: 768px) {
   .home-layout {
     grid-template-columns: 1fr;
+  }
+
+  .settings-col {
+    position: static;
+    order: -1;
   }
 }
 

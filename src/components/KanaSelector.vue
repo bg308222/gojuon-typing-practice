@@ -2,22 +2,10 @@
   <div class="selector">
     <div class="selector-header">
       <h2 class="selector-title">選擇練習範圍</h2>
-      <div class="script-toggle">
-        <button
-          v-for="opt in scriptOptions"
-          :key="opt.value"
-          class="toggle-btn"
-          :class="{ active: settings.selectedScript === opt.value }"
-          @click="settings.selectedScript = opt.value as ScriptType"
-        >{{ opt.label }}</button>
+      <div class="quick-actions">
+        <button class="action-btn" @click="selectAll">全選</button>
+        <button class="action-btn" @click="clearAll">清除</button>
       </div>
-    </div>
-
-    <div class="quick-actions">
-      <button class="action-btn" @click="selectAll">全選</button>
-      <button class="action-btn" @click="clearAll">清除全部</button>
-      <button class="action-btn" @click="selectHiraganaOnly">只選平假名</button>
-      <button class="action-btn" @click="selectKatakanaOnly">只選片假名</button>
     </div>
 
     <div class="kana-groups">
@@ -58,7 +46,8 @@
                   :checked="isKanaSelected(kana.key)"
                   @change="toggleKana(kana.key)"
                 />
-                <span class="kana-char">{{ getDisplay(kana) }}</span>
+                <span class="kana-char hira">{{ kana.hiragana }}</span>
+                <span class="kana-char kata">{{ kana.katakana }}</span>
                 <span class="kana-romaji">{{ kana.romaji[0] }}</span>
               </label>
             </div>
@@ -67,46 +56,21 @@
       </div>
     </div>
 
-    <div class="selector-footer">
-      <span class="count-label">已選 {{ selectedCount }} 個假名</span>
-      <button
-        class="start-btn"
-        :disabled="selectedCount === 0"
-        @click="emit('start')"
-      >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-        開始練習
-      </button>
-    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { KANA_TABLE, ROW_GROUPS, ROW_LABELS, type KanaEntry, type ScriptType } from '../data/kana'
+import { KANA_TABLE, ROW_GROUPS, ROW_LABELS, type KanaEntry } from '../data/kana'
 import type { AppSettings } from '../data/db'
 
 const props = defineProps<{ settings: AppSettings }>()
-const emit = defineEmits<{ start: [] }>()
-
-const scriptOptions = [
-  { value: 'hiragana', label: '平假名' },
-  { value: 'katakana', label: '片假名' },
-  { value: 'both',     label: '兩者' },
-]
-
-function getDisplay(kana: KanaEntry): string {
-  if (props.settings.selectedScript === 'katakana') return kana.katakana
-  return kana.hiragana
-}
 
 function getRowKana(rowId: string): KanaEntry[] {
   return KANA_TABLE.filter(k => k.row === rowId)
 }
 
 const selectedSet = computed(() => new Set(props.settings.selectedKana))
-
-const selectedCount = computed(() => props.settings.selectedKana.length)
 
 function isKanaSelected(key: string): boolean {
   return selectedSet.value.has(key)
@@ -175,16 +139,6 @@ function selectAll() {
 function clearAll() {
   props.settings.selectedKana = []
 }
-
-function selectHiraganaOnly() {
-  props.settings.selectedScript = 'hiragana'
-  props.settings.selectedKana = KANA_TABLE.map(k => k.key)
-}
-
-function selectKatakanaOnly() {
-  props.settings.selectedScript = 'katakana'
-  props.settings.selectedKana = KANA_TABLE.map(k => k.key)
-}
 </script>
 
 <style scoped>
@@ -209,41 +163,9 @@ function selectKatakanaOnly() {
   margin: 0;
 }
 
-.script-toggle {
-  display: flex;
-  gap: 0.25rem;
-  background: var(--surface-2);
-  padding: 0.25rem;
-  border-radius: 0.5rem;
-}
-
-.toggle-btn {
-  padding: 0.35rem 0.85rem;
-  border-radius: 0.35rem;
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 0.875rem;
-  font-family: inherit;
-  cursor: pointer;
-  transition: all 150ms;
-}
-
-.toggle-btn.active {
-  background: var(--primary);
-  color: #0c1a2a;
-  font-weight: 600;
-}
-
-.toggle-btn:hover:not(.active) {
-  color: var(--text);
-  background: var(--surface-hover);
-}
-
 .quick-actions {
   display: flex;
   gap: 0.5rem;
-  flex-wrap: wrap;
 }
 
 .action-btn {
@@ -268,8 +190,6 @@ function selectKatakanaOnly() {
   flex-direction: column;
   gap: 1.5rem;
 }
-
-.kana-group {}
 
 .group-header {
   margin-bottom: 0.75rem;
@@ -298,8 +218,6 @@ function selectKatakanaOnly() {
   gap: 0.75rem;
   padding-left: 1.25rem;
 }
-
-.row-block {}
 
 .row-label {
   display: flex;
@@ -333,13 +251,14 @@ function selectKatakanaOnly() {
   flex-direction: column;
   align-items: center;
   width: 3.25rem;
-  padding: 0.4rem 0.25rem;
+  padding: 0.35rem 0.25rem 0.3rem;
   border-radius: 0.4rem;
   border: 1px solid var(--border);
   background: var(--surface-2);
   cursor: pointer;
   transition: all 150ms;
   position: relative;
+  gap: 0;
 }
 
 .kana-cell input[type="checkbox"] {
@@ -359,61 +278,34 @@ function selectKatakanaOnly() {
 }
 
 .kana-char {
-  font-size: 1.25rem;
-  line-height: 1.2;
+  font-size: 1rem;
+  line-height: 1.25;
   color: var(--text);
 }
 
-.kana-cell.selected .kana-char {
-  color: var(--primary);
+.kana-char.hira {
+  font-family: 'Noto Serif JP', serif;
 }
 
-.kana-romaji {
-  font-size: 0.625rem;
-  color: var(--text-muted);
-  margin-top: 0.1rem;
-  font-family: 'Courier New', monospace;
-}
-
-.selector-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-top: 1rem;
-  border-top: 1px solid var(--border);
-  flex-wrap: wrap;
-  gap: 1rem;
-}
-
-.count-label {
+.kana-char.kata {
   font-size: 0.875rem;
   color: var(--text-muted);
 }
 
-.start-btn {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.65rem 1.5rem;
-  border-radius: 0.5rem;
-  border: none;
-  background: var(--primary);
-  color: #0c1a2a;
-  font-size: 1rem;
-  font-weight: 700;
-  font-family: inherit;
-  cursor: pointer;
-  transition: all 150ms;
+.kana-cell.selected .kana-char.hira {
+  color: var(--primary);
 }
 
-.start-btn:hover:not(:disabled) {
-  background: var(--primary-light);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 16px color-mix(in srgb, var(--primary) 40%, transparent);
+.kana-cell.selected .kana-char.kata {
+  color: var(--primary-light);
 }
 
-.start-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
+.kana-romaji {
+  font-size: 0.5625rem;
+  color: var(--text-muted);
+  margin-top: 0.15rem;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 0.02em;
 }
+
 </style>
