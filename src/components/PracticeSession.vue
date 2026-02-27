@@ -60,20 +60,14 @@
         </div>
       </div>
 
-      <!-- Feedback: wrong answer -->
-      <div v-if="wrongAnswer" class="wrong-feedback">
-        <div class="wrong-msg">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" class="wrong-icon">
-            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
-          </svg>
-          正確答案：<strong>{{ currentKana?.romaji.join(' / ') }}</strong>
-          &nbsp;或直接輸入假名字元
-        </div>
-        <div class="continue-hint">按 Enter 或 Space 繼續</div>
+      <!-- Subtle wrong indicator -->
+      <div v-if="hasBeenWrong" class="wrong-hint">
+        <span class="wrong-hint-text">答錯了 — 請繼續輸入正確答案</span>
+        <code class="wrong-hint-answer">{{ currentKana?.romaji.join(' / ') }}</code>
       </div>
 
       <!-- Input area -->
-      <div v-else class="input-wrap">
+      <div class="input-wrap">
         <div class="input-display">
           <span
             v-for="(char, i) in inputChars"
@@ -148,9 +142,7 @@ const currentKana = ref<KanaEntry | null>(null)
 const currentQualKey = ref<string>('')
 const currentInput = ref('')
 const paused = ref(false)
-const wrongAnswer = ref(false)
-const wrongAnswerKana = ref<KanaEntry | null>(null)
-const wrongAnswerInput = ref('')
+const hasBeenWrong = ref(false) // current question was already marked wrong
 
 // Stats
 const questionsAnswered = ref(0)
@@ -193,12 +185,12 @@ const timePct = computed(() => {
 const inputChars = computed(() => [...currentInput.value])
 
 const feedbackClass = computed(() => {
-  if (wrongAnswer.value) return 'wrong-kana'
+  if (hasBeenWrong.value && !currentInput.value) return 'wrong-kana'
   if (currentInput.value && currentKana.value) {
     if (isCorrect(currentInput.value, currentKana.value)) return 'correct-kana'
     if (isWrong(currentInput.value, currentKana.value)) return 'wrong-kana'
   }
-  return ''
+  return hasBeenWrong.value ? 'wrong-kana' : ''
 })
 
 function charClass(i: number): string {
@@ -238,42 +230,45 @@ function pickNext() {
   currentQualKey.value = picked.qualKey
   currentKana.value = picked.entry
   currentInput.value = ''
+  hasBeenWrong.value = false
   questionStartTime.value = Date.now()
 }
 
 function handleInput() {
-  if (!currentKana.value || paused.value || wrongAnswer.value) return
+  if (!currentKana.value || paused.value) return
 
   const input = currentInput.value
   const kana = currentKana.value
 
-  // Immediately fail when input has no valid continuation
+  // Wrong: record the mistake, clear input, let user keep trying
   if (isWrong(input, kana)) {
-    submitWrong(input)
+    if (!hasBeenWrong.value) {
+      recordWrong(input)
+    }
+    currentInput.value = ''
     return
   }
 
-  // Auto-advance
+  // Auto-advance on correct
   if (props.settings.autoAdvance && shouldAutoAdvance(input, kana)) {
-    submitCorrect()
+    advanceAfterAttempt()
   }
 }
 
 function handleKeydown(e: KeyboardEvent) {
   if (paused.value) return
 
-  if (wrongAnswer.value) {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault()
-      wrongAnswer.value = false
-      nextQuestion()
-    }
-    return
-  }
-
   if (e.key === 'Enter') {
     e.preventDefault()
-    submitAnswer()
+    const input = currentInput.value.trim()
+    const kana = currentKana.value
+    if (!kana) return
+    if (isCorrect(input, kana)) {
+      advanceAfterAttempt()
+    } else if (input.length > 0) {
+      if (!hasBeenWrong.value) recordWrong(input)
+      currentInput.value = ''
+    }
   }
 
   if (e.key === 'Escape') {
@@ -282,35 +277,14 @@ function handleKeydown(e: KeyboardEvent) {
   }
 }
 
-function submitAnswer() {
-  if (!currentKana.value) return
-  const input = currentInput.value.trim()
-  const kana = currentKana.value
-
-  if (isCorrect(input, kana)) {
-    submitCorrect()
-  } else {
-    submitWrong(input)
-  }
-}
-
-function submitCorrect() {
-  const elapsed = Date.now() - questionStartTime.value
-  const qualKey = currentQualKey.value
-  questionTimes.value.push({ key: qualKey, time: elapsed })
-  emit('updateStat', qualKey, true, elapsed)
-  correctCount.value++
-  questionsAnswered.value++
-  currentInput.value = ''
-  checkEndCondition() || nextQuestion()
-}
-
-function submitWrong(input: string) {
+// Record a wrong attempt without advancing — lets user keep trying
+function recordWrong(input: string) {
   const elapsed = Date.now() - questionStartTime.value
   const qualKey = currentQualKey.value
   emit('updateStat', qualKey, false, elapsed)
   wrongCount.value++
   questionsAnswered.value++
+  hasBeenWrong.value = true
 
   wrongAnswersList.value.push({
     qualKey,
@@ -319,12 +293,22 @@ function submitWrong(input: string) {
     correctAnswers: [currentKana.value!.hiragana, currentKana.value!.katakana, ...currentKana.value!.romaji],
   })
 
-  wrongAnswerKana.value = currentKana.value
-  wrongAnswerInput.value = input
-  wrongAnswer.value = true
-  currentInput.value = ''
-
   checkEndCondition()
+}
+
+// Called when the user finally gets the answer right (or was already wrong and got it)
+function advanceAfterAttempt() {
+  if (!hasBeenWrong.value) {
+    // First-try correct
+    const elapsed = Date.now() - questionStartTime.value
+    const qualKey = currentQualKey.value
+    questionTimes.value.push({ key: qualKey, time: elapsed })
+    emit('updateStat', qualKey, true, elapsed)
+    correctCount.value++
+    questionsAnswered.value++
+  }
+  currentInput.value = ''
+  if (!checkEndCondition()) nextQuestion()
 }
 
 function nextQuestion() {
@@ -604,39 +588,27 @@ watch(paused, (val) => {
   letter-spacing: 0.1em;
 }
 
-.wrong-feedback {
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  align-items: center;
-}
-
-.wrong-msg {
+.wrong-hint {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  font-size: 1rem;
-  color: var(--text);
-  background: color-mix(in srgb, var(--error) 12%, var(--surface-2));
-  border: 1px solid color-mix(in srgb, var(--error) 30%, transparent);
-  padding: 0.75rem 1.25rem;
-  border-radius: 0.5rem;
-}
-
-.wrong-msg strong {
-  color: var(--success);
-  font-family: 'Courier New', monospace;
-}
-
-.wrong-icon {
+  gap: 0.75rem;
+  font-size: 0.875rem;
   color: var(--error);
-  flex-shrink: 0;
+  background: color-mix(in srgb, var(--error) 8%, var(--surface-2));
+  border: 1px solid color-mix(in srgb, var(--error) 25%, transparent);
+  padding: 0.5rem 1rem;
+  border-radius: 0.4rem;
 }
 
-.continue-hint {
-  font-size: 0.8125rem;
+.wrong-hint-text {
   color: var(--text-muted);
+}
+
+.wrong-hint-answer {
+  font-family: 'Courier New', monospace;
+  color: var(--success);
+  background: transparent;
+  font-size: 0.9375rem;
 }
 
 .input-wrap {
