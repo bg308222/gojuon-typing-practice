@@ -103,8 +103,9 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import {
-  KANA_TABLE, type KanaEntry,
-  isCorrect, shouldAutoAdvance, isWrong, pickWeightedKana
+  type KanaEntry,
+  isCorrect, shouldAutoAdvance, isWrong,
+  entryFromKey, displayChar,
 } from '../data/kana'
 import type { AppSettings, KanaStat } from '../data/db'
 
@@ -131,13 +132,17 @@ export interface SessionResult {
 }
 
 export interface WrongAnswer {
+  qualKey: string
   kana: KanaEntry
   userInput: string
   correctAnswers: string[]
 }
 
+interface PoolItem { qualKey: string; entry: KanaEntry }
+
 // State
 const currentKana = ref<KanaEntry | null>(null)
+const currentQualKey = ref<string>('')
 const currentInput = ref('')
 const paused = ref(false)
 const wrongAnswer = ref(false)
@@ -159,19 +164,18 @@ const timerInterval = ref<ReturnType<typeof setInterval> | null>(null)
 // DOM
 const inputRef = ref<HTMLInputElement | null>(null)
 
-// Selected kana list
-const kanaPool = computed<KanaEntry[]>(() => {
-  const keys = new Set(props.settings.selectedKana)
-  return KANA_TABLE.filter(k => keys.has(k.key))
-})
+// Selected kana pool — one entry per qualified key (e.g. "ka-h", "ka-k")
+const kanaPool = computed<PoolItem[]>(() =>
+  props.settings.selectedKana.flatMap(qualKey => {
+    const entry = entryFromKey(qualKey)
+    return entry ? [{ qualKey, entry }] : []
+  })
+)
 
-// Display
+// Display character based on the current qualified key
 const displayKana = computed(() => {
-  if (!currentKana.value) return ''
-  if (props.settings.selectedScript === 'katakana') return currentKana.value.katakana
-  if (props.settings.selectedScript === 'hiragana') return currentKana.value.hiragana
-  // both: show hiragana
-  return currentKana.value.hiragana
+  if (!currentQualKey.value) return ''
+  return displayChar(currentQualKey.value)
 })
 
 const progressPct = computed(() => {
@@ -207,13 +211,29 @@ function charClass(i: number): string {
 }
 
 function pickNext() {
-  if (kanaPool.value.length === 0) return
-  const stats = props.kanaStats
+  const pool = kanaPool.value
+  if (pool.length === 0) return
+  let picked: PoolItem
   if (props.settings.weightedRandom) {
-    currentKana.value = pickWeightedKana(kanaPool.value, stats)
+    const weights = pool.map(item => {
+      const s = props.kanaStats[item.qualKey]
+      if (!s || s.attempts === 0) return 2
+      const errorRate = 1 - s.correct / s.attempts
+      return 0.2 + errorRate * 4
+    })
+    const total = weights.reduce((a, b) => a + b, 0)
+    let rand = Math.random() * total
+    let idx = pool.length - 1
+    for (let i = 0; i < pool.length; i++) {
+      rand -= weights[i]!
+      if (rand <= 0) { idx = i; break }
+    }
+    picked = pool[idx]!
   } else {
-    currentKana.value = kanaPool.value[Math.floor(Math.random() * kanaPool.value.length)] ?? null
+    picked = pool[Math.floor(Math.random() * pool.length)]!
   }
+  currentQualKey.value = picked.qualKey
+  currentKana.value = picked.entry
   currentInput.value = ''
   questionStartTime.value = Date.now()
 }
@@ -273,9 +293,9 @@ function submitAnswer() {
 
 function submitCorrect() {
   const elapsed = Date.now() - questionStartTime.value
-  const key = currentKana.value!.key
-  questionTimes.value.push({ key, time: elapsed })
-  emit('updateStat', key, true, elapsed)
+  const qualKey = currentQualKey.value
+  questionTimes.value.push({ key: qualKey, time: elapsed })
+  emit('updateStat', qualKey, true, elapsed)
   correctCount.value++
   questionsAnswered.value++
   currentInput.value = ''
@@ -284,12 +304,13 @@ function submitCorrect() {
 
 function submitWrong(input: string) {
   const elapsed = Date.now() - questionStartTime.value
-  const key = currentKana.value!.key
-  emit('updateStat', key, false, elapsed)
+  const qualKey = currentQualKey.value
+  emit('updateStat', qualKey, false, elapsed)
   wrongCount.value++
   questionsAnswered.value++
 
   wrongAnswersList.value.push({
+    qualKey,
     kana: currentKana.value!,
     userInput: input,
     correctAnswers: [currentKana.value!.hiragana, currentKana.value!.katakana, ...currentKana.value!.romaji],

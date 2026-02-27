@@ -60,7 +60,7 @@
       <h3 class="section-title">答錯的假名</h3>
       <div class="wrong-grid">
         <div v-for="(wa, i) in result.wrongAnswers" :key="i" class="wrong-item">
-          <div class="wrong-kana">{{ wa.kana.hiragana }}</div>
+          <div class="wrong-kana">{{ displayChar(wa.qualKey) }}</div>
           <div class="wrong-details">
             <span class="wrong-input">你輸入：<code>{{ wa.userInput || '（空白）' }}</code></span>
             <span class="wrong-correct">正確：<code>{{ wa.kana.romaji.join(' / ') }}</code></span>
@@ -85,10 +85,10 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { KANA_TABLE } from '../data/kana'
+import { displayChar } from '../data/kana'
 import type { SessionResult } from './PracticeSession.vue'
 
-const props = defineProps<{ result: SessionResult; script: 'hiragana' | 'katakana' | 'both' }>()
+const props = defineProps<{ result: SessionResult }>()
 const emit = defineEmits<{ back: []; restart: [] }>()
 
 const CIRCUMFERENCE = 2 * Math.PI * 52
@@ -114,10 +114,8 @@ function formatTime(ms: number): string {
   return ms + 'ms'
 }
 
-function getKanaDisplay(key: string): string {
-  const kana = KANA_TABLE.find(k => k.key === key)
-  if (!kana) return key
-  return props.script === 'katakana' ? kana.katakana : kana.hiragana
+function getKanaDisplay(qualKey: string): string {
+  return displayChar(qualKey)
 }
 </script>
 

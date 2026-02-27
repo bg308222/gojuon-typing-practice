@@ -65,7 +65,6 @@
         <div v-else-if="view === 'result' && lastResult" class="result-layout">
           <ResultScreen
             :result="lastResult"
-            :script="settings.selectedScript"
             @back="goHome"
             @restart="startPractice"
           />
@@ -100,7 +99,6 @@ type View = 'home' | 'practice' | 'result' | 'stats'
 const view = ref<View>('home')
 const settings = ref<AppSettings>({
   selectedKana: [],
-  selectedScript: 'hiragana',
   practiceMode: 'count',
   questionCount: 20,
   timeLimit: 60,
@@ -167,7 +165,6 @@ function onCleared() {
   sessions.value = []
   settings.value = {
     selectedKana: [],
-    selectedScript: 'hiragana',
     practiceMode: 'count',
     questionCount: 20,
     timeLimit: 60,

@@ -148,6 +148,32 @@ export const ROW_LABELS: Record<string, string> = {
 
 export type ScriptType = 'hiragana' | 'katakana' | 'both'
 
+/** Convert a base kana key to a script-qualified key: "ka" → "ka-h" or "ka-k" */
+export function toHiraKey(baseKey: string): string { return baseKey + '-h' }
+export function toKataKey(baseKey: string): string { return baseKey + '-k' }
+
+/** Extract base key and script from a qualified key: "ka-h" → { base: "ka", script: "hiragana" } */
+export function parseKey(qualKey: string): { base: string; script: 'hiragana' | 'katakana' } {
+  if (qualKey.endsWith('-k')) return { base: qualKey.slice(0, -2), script: 'katakana' }
+  if (qualKey.endsWith('-h')) return { base: qualKey.slice(0, -2), script: 'hiragana' }
+  // Legacy bare key — treat as hiragana
+  return { base: qualKey, script: 'hiragana' }
+}
+
+/** Get the KanaEntry for a qualified key */
+export function entryFromKey(qualKey: string): KanaEntry | undefined {
+  const { base } = parseKey(qualKey)
+  return KANA_TABLE.find(k => k.key === base)
+}
+
+/** Get the display character for a qualified key */
+export function displayChar(qualKey: string): string {
+  const { base, script } = parseKey(qualKey)
+  const entry = KANA_TABLE.find(k => k.key === base)
+  if (!entry) return qualKey
+  return script === 'katakana' ? entry.katakana : entry.hiragana
+}
+
 /** Returns accepted inputs for a kana entry */
 export function getAcceptedInputs(kana: KanaEntry): string[] {
   return [kana.hiragana, kana.katakana, ...kana.romaji]

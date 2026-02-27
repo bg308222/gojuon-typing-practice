@@ -34,34 +34,44 @@
               <span class="row-name">{{ ROW_LABELS[rowId] }}</span>
             </label>
             <div class="kana-cells">
-              <label
+              <div
                 v-for="kana in getRowKana(rowId)"
                 :key="kana.key"
-                class="kana-cell"
-                :class="{ selected: isKanaSelected(kana.key) }"
+                class="kana-pair"
                 :title="kana.romaji.join(' / ')"
               >
-                <input
-                  type="checkbox"
-                  :checked="isKanaSelected(kana.key)"
-                  @change="toggleKana(kana.key)"
-                />
-                <span class="kana-char hira">{{ kana.hiragana }}</span>
-                <span class="kana-char kata">{{ kana.katakana }}</span>
+                <!-- 平假名 -->
+                <label
+                  class="kana-cell"
+                  :class="{ selected: isSelected(kana.key, 'h') }"
+                >
+                  <input type="checkbox" :checked="isSelected(kana.key, 'h')" @change="toggle(kana.key, 'h')" />
+                  <span class="kana-char">{{ kana.hiragana }}</span>
+                  <span class="kana-script-tag">平</span>
+                </label>
+                <!-- 片假名 -->
+                <label
+                  class="kana-cell"
+                  :class="{ selected: isSelected(kana.key, 'k') }"
+                >
+                  <input type="checkbox" :checked="isSelected(kana.key, 'k')" @change="toggle(kana.key, 'k')" />
+                  <span class="kana-char kata">{{ kana.katakana }}</span>
+                  <span class="kana-script-tag">片</span>
+                </label>
+                <!-- romaji label -->
                 <span class="kana-romaji">{{ kana.romaji[0] }}</span>
-              </label>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </div>
-
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { KANA_TABLE, ROW_GROUPS, ROW_LABELS, type KanaEntry } from '../data/kana'
+import { KANA_TABLE, ROW_GROUPS, ROW_LABELS, toHiraKey, toKataKey, type KanaEntry } from '../data/kana'
 import type { AppSettings } from '../data/db'
 
 const props = defineProps<{ settings: AppSettings }>()
@@ -72,20 +82,47 @@ function getRowKana(rowId: string): KanaEntry[] {
 
 const selectedSet = computed(() => new Set(props.settings.selectedKana))
 
-function isKanaSelected(key: string): boolean {
-  return selectedSet.value.has(key)
+function isSelected(baseKey: string, script: 'h' | 'k'): boolean {
+  const qualKey = script === 'h' ? toHiraKey(baseKey) : toKataKey(baseKey)
+  return selectedSet.value.has(qualKey)
 }
 
+function toggle(baseKey: string, script: 'h' | 'k') {
+  const qualKey = script === 'h' ? toHiraKey(baseKey) : toKataKey(baseKey)
+  const list = [...props.settings.selectedKana]
+  const idx = list.indexOf(qualKey)
+  if (idx >= 0) list.splice(idx, 1)
+  else list.push(qualKey)
+  props.settings.selectedKana = list
+}
+
+// Row-level: checks both h and k keys for all kana in row
 function isRowSelected(rowId: string): boolean {
   const kana = getRowKana(rowId)
-  return kana.length > 0 && kana.every(k => selectedSet.value.has(k.key))
+  return kana.length > 0 && kana.every(k =>
+    selectedSet.value.has(toHiraKey(k.key)) && selectedSet.value.has(toKataKey(k.key))
+  )
 }
 
 function isRowIndeterminate(rowId: string): boolean {
   const kana = getRowKana(rowId)
-  const some = kana.some(k => selectedSet.value.has(k.key))
-  const all  = kana.every(k => selectedSet.value.has(k.key))
-  return some && !all
+  const anySelected = kana.some(k =>
+    selectedSet.value.has(toHiraKey(k.key)) || selectedSet.value.has(toKataKey(k.key))
+  )
+  return anySelected && !isRowSelected(rowId)
+}
+
+function toggleRow(rowId: string) {
+  const kana = getRowKana(rowId)
+  const allSelected = isRowSelected(rowId)
+  const list = new Set(props.settings.selectedKana)
+  kana.forEach(k => {
+    const hk = toHiraKey(k.key)
+    const kk = toKataKey(k.key)
+    if (allSelected) { list.delete(hk); list.delete(kk) }
+    else { list.add(hk); list.add(kk) }
+  })
+  props.settings.selectedKana = [...list]
 }
 
 function isGroupSelected(group: typeof ROW_GROUPS[0]): boolean {
@@ -95,29 +132,11 @@ function isGroupSelected(group: typeof ROW_GROUPS[0]): boolean {
 function isGroupIndeterminate(group: typeof ROW_GROUPS[0]): boolean {
   const some = group.rows.some(r => {
     const kana = getRowKana(r)
-    return kana.some(k => selectedSet.value.has(k.key))
+    return kana.some(k =>
+      selectedSet.value.has(toHiraKey(k.key)) || selectedSet.value.has(toKataKey(k.key))
+    )
   })
   return some && !isGroupSelected(group)
-}
-
-function toggleKana(key: string) {
-  const list = [...props.settings.selectedKana]
-  const idx = list.indexOf(key)
-  if (idx >= 0) list.splice(idx, 1)
-  else list.push(key)
-  props.settings.selectedKana = list
-}
-
-function toggleRow(rowId: string) {
-  const kana = getRowKana(rowId)
-  const allSelected = kana.every(k => selectedSet.value.has(k.key))
-  const list = new Set(props.settings.selectedKana)
-  if (allSelected) {
-    kana.forEach(k => list.delete(k.key))
-  } else {
-    kana.forEach(k => list.add(k.key))
-  }
-  props.settings.selectedKana = [...list]
 }
 
 function toggleGroup(group: typeof ROW_GROUPS[0]) {
@@ -125,15 +144,19 @@ function toggleGroup(group: typeof ROW_GROUPS[0]) {
   const list = new Set(props.settings.selectedKana)
   group.rows.forEach(rowId => {
     getRowKana(rowId).forEach(k => {
-      if (allSelected) list.delete(k.key)
-      else list.add(k.key)
+      const hk = toHiraKey(k.key)
+      const kk = toKataKey(k.key)
+      if (allSelected) { list.delete(hk); list.delete(kk) }
+      else { list.add(hk); list.add(kk) }
     })
   })
   props.settings.selectedKana = [...list]
 }
 
 function selectAll() {
-  props.settings.selectedKana = KANA_TABLE.map(k => k.key)
+  const all: string[] = []
+  KANA_TABLE.forEach(k => { all.push(toHiraKey(k.key)); all.push(toKataKey(k.key)) })
+  props.settings.selectedKana = all
 }
 
 function clearAll() {
@@ -243,22 +266,30 @@ function clearAll() {
 .kana-cells {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.4rem;
+  gap: 0.5rem;
+}
+
+/* One sound = a pair of two cells stacked + romaji below */
+.kana-pair {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
 }
 
 .kana-cell {
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: 3.25rem;
-  padding: 0.35rem 0.25rem 0.3rem;
-  border-radius: 0.4rem;
+  width: 2.75rem;
+  padding: 0.3rem 0.2rem 0.2rem;
+  border-radius: 0.35rem;
   border: 1px solid var(--border);
   background: var(--surface-2);
   cursor: pointer;
   transition: all 150ms;
   position: relative;
-  gap: 0;
+  gap: 0.1rem;
 }
 
 .kana-cell input[type="checkbox"] {
@@ -278,21 +309,18 @@ function clearAll() {
 }
 
 .kana-char {
-  font-size: 1rem;
-  line-height: 1.25;
+  font-size: 1.125rem;
+  line-height: 1.2;
   color: var(--text);
-}
-
-.kana-char.hira {
   font-family: 'Noto Serif JP', serif;
 }
 
 .kana-char.kata {
-  font-size: 0.875rem;
+  font-family: 'Noto Sans JP', sans-serif;
   color: var(--text-muted);
 }
 
-.kana-cell.selected .kana-char.hira {
+.kana-cell.selected .kana-char {
   color: var(--primary);
 }
 
@@ -300,12 +328,22 @@ function clearAll() {
   color: var(--primary-light);
 }
 
+.kana-script-tag {
+  font-size: 0.5rem;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
+.kana-cell.selected .kana-script-tag {
+  color: color-mix(in srgb, var(--primary) 70%, var(--text-muted));
+}
+
 .kana-romaji {
   font-size: 0.5625rem;
   color: var(--text-muted);
-  margin-top: 0.15rem;
+  margin-top: 0.1rem;
   font-family: 'Courier New', monospace;
   letter-spacing: 0.02em;
 }
-
 </style>

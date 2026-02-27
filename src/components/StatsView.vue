@@ -46,10 +46,10 @@
         </div>
         <div
           v-for="row in sortedKanaStats"
-          :key="row.key"
+          :key="row.qualKey"
           class="table-row"
         >
-          <span class="table-kana">{{ row.hiragana }}</span>
+          <span class="table-kana">{{ row.display }}</span>
           <span class="table-val">{{ row.attempts }}</span>
           <span class="table-accuracy">
             <span class="accuracy-bar-wrap">
@@ -96,7 +96,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { KANA_TABLE } from '../data/kana'
+import { displayChar } from '../data/kana'
 import type { KanaStat, Session } from '../data/db'
 import { db } from '../data/db'
 
@@ -116,9 +116,8 @@ const tabs = [
 ]
 
 interface KanaStatRow {
-  key: string
-  hiragana: string
-  katakana: string
+  qualKey: string
+  display: string
   attempts: number
   correct: number
   accuracy: number
@@ -126,20 +125,16 @@ interface KanaStatRow {
 }
 
 const kanaStatRows = computed<KanaStatRow[]>(() =>
-  KANA_TABLE
-    .filter(k => (props.kanaStats[k.key]?.attempts ?? 0) > 0)
-    .map(k => {
-      const s = props.kanaStats[k.key]!
-      return {
-        key: k.key,
-        hiragana: k.hiragana,
-        katakana: k.katakana,
-        attempts: s.attempts,
-        correct: s.correct,
-        accuracy: s.attempts === 0 ? 0 : Math.round((s.correct / s.attempts) * 100),
-        avgTime: s.attempts === 0 ? 0 : Math.round(s.totalTime / s.attempts),
-      }
-    })
+  Object.entries(props.kanaStats)
+    .filter(([, s]) => s.attempts > 0)
+    .map(([qualKey, s]) => ({
+      qualKey,
+      display: displayChar(qualKey),
+      attempts: s.attempts,
+      correct: s.correct,
+      accuracy: Math.round((s.correct / s.attempts) * 100),
+      avgTime: Math.round(s.totalTime / s.attempts),
+    }))
 )
 
 const sortedKanaStats = computed(() => {

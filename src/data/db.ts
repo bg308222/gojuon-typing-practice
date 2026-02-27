@@ -19,7 +19,6 @@ export interface Session {
 
 export interface AppSettings {
   selectedKana: string[]
-  selectedScript: 'hiragana' | 'katakana' | 'both'
   practiceMode: 'count' | 'time' | 'infinite'
   questionCount: number
   timeLimit: number
@@ -31,7 +30,6 @@ export interface AppSettings {
 
 export const DEFAULT_SETTINGS: AppSettings = {
   selectedKana: [],
-  selectedScript: 'hiragana',
   practiceMode: 'count',
   questionCount: 20,
   timeLimit: 60,
