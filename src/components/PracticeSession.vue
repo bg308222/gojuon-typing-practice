@@ -127,6 +127,7 @@ export interface SessionResult {
   wrongAnswers: WrongAnswer[]
   fastestKana: string | null
   slowestKana: string | null
+  questionDistribution: Record<string, number>
 }
 
 export interface WrongAnswer {
@@ -152,6 +153,7 @@ const wrongCount = ref(0)
 const wrongAnswersList = ref<WrongAnswer[]>([])
 const questionStartTime = ref(0)
 const questionTimes = ref<{ key: string; time: number }[]>([])
+const questionDistribution = ref<Record<string, number>>({})
 
 // Timer
 const timeLeft = ref(props.settings.timeLimit)
@@ -233,6 +235,7 @@ function pickNext() {
   currentInput.value = ''
   hasBeenWrong.value = false
   questionStartTime.value = Date.now()
+  questionDistribution.value[picked.qualKey] = (questionDistribution.value[picked.qualKey] ?? 0) + 1
 }
 
 function handleInput() {
@@ -353,6 +356,7 @@ function finishSession() {
     wrongAnswers: wrongAnswersList.value,
     fastestKana,
     slowestKana,
+    questionDistribution: questionDistribution.value,
   })
 }
 

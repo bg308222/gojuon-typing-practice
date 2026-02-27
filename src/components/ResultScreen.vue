@@ -55,6 +55,28 @@
       </div>
     </div>
 
+    <!-- Question distribution -->
+    <div v-if="distributionItems.length > 0" class="dist-section">
+      <h3 class="section-title">出題分佈</h3>
+      <div class="dist-grid">
+        <div
+          v-for="item in distributionItems"
+          :key="item.qualKey"
+          class="dist-item"
+          :title="`${displayChar(item.qualKey)}（${item.romaji}）× ${item.count}`"
+        >
+          <div class="dist-bar-wrap">
+            <div
+              class="dist-bar"
+              :style="{ height: Math.max(4, Math.round((item.count / maxCount) * 48)) + 'px' }"
+            ></div>
+          </div>
+          <div class="dist-kana">{{ displayChar(item.qualKey) }}</div>
+          <div class="dist-count">{{ item.count }}</div>
+        </div>
+      </div>
+    </div>
+
     <!-- Wrong answers -->
     <div v-if="result.wrongAnswers.length > 0" class="wrong-section">
       <h3 class="section-title">答錯的假名</h3>
@@ -85,7 +107,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { displayChar } from '../data/kana'
+import { displayChar, entryFromKey } from '../data/kana'
 import type { SessionResult } from './PracticeSession.vue'
 
 const props = defineProps<{ result: SessionResult }>()
@@ -117,6 +139,20 @@ function formatTime(ms: number): string {
 function getKanaDisplay(qualKey: string): string {
   return displayChar(qualKey)
 }
+
+const distributionItems = computed(() => {
+  const dist = props.result.questionDistribution
+  return Object.entries(dist)
+    .map(([qualKey, count]) => {
+      const entry = entryFromKey(qualKey)
+      return { qualKey, count, romaji: entry?.romaji[0] ?? qualKey }
+    })
+    .sort((a, b) => b.count - a.count)
+})
+
+const maxCount = computed(() =>
+  distributionItems.value.reduce((m, item) => Math.max(m, item.count), 1)
+)
 </script>
 
 <style scoped>
@@ -221,6 +257,51 @@ function getKanaDisplay(qualKey: string): string {
 .stat-label {
   font-size: 0.75rem;
   color: var(--text-muted);
+}
+
+.dist-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: flex-end;
+}
+
+.dist-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  min-width: 2.5rem;
+}
+
+.dist-bar-wrap {
+  height: 52px;
+  display: flex;
+  align-items: flex-end;
+}
+
+.dist-bar {
+  width: 1.5rem;
+  border-radius: 3px 3px 0 0;
+  background: var(--primary);
+  opacity: 0.75;
+  transition: opacity 150ms;
+}
+
+.dist-item:hover .dist-bar {
+  opacity: 1;
+}
+
+.dist-kana {
+  font-size: 1.1rem;
+  line-height: 1;
+  color: var(--text);
+}
+
+.dist-count {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .wrong-section {}
