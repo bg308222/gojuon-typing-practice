@@ -175,12 +175,29 @@ function onCleared() {
   }
 }
 
-// Keyboard shortcut: R or Backspace from result → home
+// Global keyboard shortcuts
 function handleGlobalKey(e: KeyboardEvent) {
-  if (view.value === 'result') {
-    if (e.key === 'r' || e.key === 'R' || e.key === 'Backspace') {
+  // Enter: 首頁開始練習 / 結果頁再練一次
+  if (e.key === 'Enter') {
+    if (view.value === 'home') {
+      e.preventDefault()
+      startPractice()
+      return
+    }
+    if (view.value === 'result') {
+      e.preventDefault()
+      startPractice()
+      return
+    }
+  }
+
+  // Escape: 回到首頁（練習中由 PracticeSession 自行處理暫停邏輯）
+  if (e.key === 'Escape') {
+    if (view.value === 'home' || view.value === 'result' || view.value === 'stats') {
+      e.preventDefault()
       goHome()
     }
+    // view === 'practice' 的 Escape 由 PracticeSession 處理
   }
 }
 

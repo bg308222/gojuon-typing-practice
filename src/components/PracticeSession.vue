@@ -45,6 +45,7 @@
       <div class="pause-card">
         <p class="pause-text">已暫停</p>
         <button class="resume-btn" @click="togglePause">繼續（Esc）</button>
+        <button class="quit-btn" @click="emit('stop')">回首頁（再按 Esc）</button>
       </div>
     </div>
 
@@ -273,7 +274,12 @@ function handleKeydown(e: KeyboardEvent) {
 
   if (e.key === 'Escape') {
     e.preventDefault()
-    togglePause()
+    if (paused.value) {
+      // 已暫停再按 Esc → 回首頁
+      emit('stop')
+    } else {
+      togglePause()
+    }
   }
 }
 
@@ -385,7 +391,11 @@ onUnmounted(() => {
 
 function globalKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape') {
-    togglePause()
+    if (paused.value) {
+      emit('stop')
+    } else {
+      togglePause()
+    }
   }
 }
 
@@ -544,6 +554,23 @@ watch(paused, (val) => {
 
 .resume-btn:hover {
   background: var(--primary-light);
+}
+
+.quit-btn {
+  padding: 0.4rem 1rem;
+  border-radius: 0.4rem;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 150ms;
+}
+
+.quit-btn:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
 }
 
 .practice-body {
