@@ -139,12 +139,17 @@ export interface WrongAnswer {
 
 interface PoolItem { qualKey: string; entry: KanaEntry }
 
+const DEDUPLICATION_COUNT = 5
+
 // State
 const currentKana = ref<KanaEntry | null>(null)
 const currentQualKey = ref<string>('')
 const currentInput = ref('')
 const paused = ref(false)
 const hasBeenWrong = ref(false) // current question was already marked wrong
+
+// Recent question keys for deduplication
+const recentKeys = ref<string[]>([])
 
 // Stats
 const questionsAnswered = ref(0)
@@ -208,10 +213,7 @@ function charClass(i: number): string {
   return 'char-ok'
 }
 
-function pickNext() {
-  const pool = kanaPool.value
-  if (pool.length === 0) return
-  let picked: PoolItem
+function pickWeighted(pool: PoolItem[]): PoolItem {
   if (props.settings.weightedRandom) {
     const weights = pool.map(item => {
       const s = props.kanaStats[item.qualKey]
@@ -226,10 +228,31 @@ function pickNext() {
       rand -= weights[i]!
       if (rand <= 0) { idx = i; break }
     }
-    picked = pool[idx]!
+    return pool[idx]!
   } else {
-    picked = pool[Math.floor(Math.random() * pool.length)]!
+    return pool[Math.floor(Math.random() * pool.length)]!
   }
+}
+
+function pickNext() {
+  const pool = kanaPool.value
+  if (pool.length === 0) return
+
+  let picked: PoolItem
+  if (pool.length <= DEDUPLICATION_COUNT) {
+    picked = pickWeighted(pool)
+  } else {
+    const recent = recentKeys.value
+    let attempts = 0
+    do {
+      picked = pickWeighted(pool)
+      attempts++
+    } while (recent.includes(picked.qualKey) && attempts < pool.length * 2)
+  }
+
+  // Update recent history (keep last DEDUPLICATION_COUNT)
+  recentKeys.value = [...recentKeys.value.slice(-(DEDUPLICATION_COUNT - 1)), picked.qualKey]
+
   currentQualKey.value = picked.qualKey
   currentKana.value = picked.entry
   currentInput.value = ''
