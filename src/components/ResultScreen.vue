@@ -57,7 +57,7 @@
 
     <!-- Question distribution -->
     <div v-if="distributionItems.length > 0" class="dist-section">
-      <h3 class="section-title">出題分佈</h3>
+      <h3 class="section-title">出題分佈 (共 {{ distributionItems.length }} 題)</h3>
       <div class="dist-grid">
         <div
           v-for="item in distributionItems"
